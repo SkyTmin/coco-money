@@ -2,188 +2,149 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Учёт доходов и расходов</title>
+  <title>CocoMoney</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f4f4f4;
-      margin: 0;
-      padding: 20px;
-    }
-    .app-container {
-      max-width: 800px;
-      margin: 0 auto;
-      background: #fff;
-      padding: 20px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
-    .controls input, .controls button {
-      margin: 5px;
-      padding: 10px;
-    }
-    .list {
-      margin-top: 20px;
-      padding: 15px;
-      border: 1px solid #ccc;
-      background: #fafafa;
-    }
-    .list-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .expenses .expense-item {
-      display: flex;
-      justify-content: space-between;
-    }
-    .add-expense input {
-      margin-right: 5px;
-    }
+    body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; }
+    .list { border: 1px solid #ccc; padding: 1rem; margin-bottom: 1rem; }
+    .expenses { margin-left: 1rem; }
+    button { margin-left: 0.5rem; }
   </style>
 </head>
 <body>
-  <div class="app-container">
-    <h1>Учёт доходов и расходов</h1>
-    <div class="controls">
-      <input type="text" id="income-list-name" placeholder="Название листа поступлений" />
-      <input type="number" id="income-amount" placeholder="Сумма поступления" />
-      <input type="date" id="income-date" />
-      <button id="create-list-btn">Создать лист</button>
-    </div>
-    <div id="lists-container"></div>
-  </div>
+  <h1>💸 CocoMoney</h1>
+
+  <form id="new-list-form">
+    <input type="text" id="name" placeholder="Название" required>
+    <input type="number" id="budget" placeholder="Бюджет" required>
+    <button type="submit">Добавить</button>
+  </form>
+
+  <div id="lists"></div>
+
   <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
 
-    const supabaseUrl = 'https://vflflxppglrgdcxeszzu.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmbGZseHBwZ2xyZ2RjeGVzenp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1MjI4MzMsImV4cCI6MjA2MTA5ODgzM30.oFsEJ21xU05QyXZxfSXv0WKW4P8ps3HcB4Ot7kK7DDQ';
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(
+      "https://vflflxppglrgdcxeszzu.supabase.co", // ← замените на ваш
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmbGZseHBwZ2xyZ2RjeGVzenp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1MjI4MzMsImV4cCI6MjA2MTA5ODgzM30.oFsEJ21xU05QyXZxfSXv0WKW4P8ps3HcB4Ot7kK7DDQ"                    // ← замените на ваш
+    );
 
-    const listsContainer = document.getElementById('lists-container');
-    const createListBtn = document.getElementById('create-list-btn');
-    const incomeListNameInput = document.getElementById('income-list-name');
-    const incomeAmountInput = document.getElementById('income-amount');
-    const incomeDateInput = document.getElementById('income-date');
+    const listsContainer = document.getElementById('lists');
+    const form = document.getElementById('new-list-form');
 
-    createListBtn.addEventListener('click', async () => {
-      const name = incomeListNameInput.value.trim();
-      const income = parseFloat(incomeAmountInput.value);
-      const date = incomeDateInput.value;
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('name').value;
+      const budget = parseFloat(document.getElementById('budget').value);
 
-      if (!name || isNaN(income) || income <= 0 || !date) {
-        alert('Проверьте корректность введённых данных.');
-        return;
-      }
-
-      const { error } = await supabase.from('cocomoney').insert([{
+      const { error } = await supabase.from('cocomoney').insert({
         name,
-        income,
-        remaining: income,
-        date,
+        budget,
+        remaining: budget,
         expenses: []
-      }]);
+      });
 
       if (error) {
-        console.error('Ошибка при создании листа:', error);
-        alert('Ошибка при создании листа. Проверьте консоль.');
-        return;
+        console.error('Ошибка при добавлении списка:', error);
+      } else {
+        form.reset();
+        fetchLists();
       }
-
-      incomeListNameInput.value = '';
-      incomeAmountInput.value = '';
-      incomeDateInput.value = '';
-      fetchLists();
     });
 
     async function fetchLists() {
       const { data, error } = await supabase.from('cocomoney').select('*');
       if (error) {
-        console.error('Ошибка при загрузке:', error);
+        console.error('Ошибка при получении списков:', error);
         return;
       }
-      renderLists(data);
-    }
 
-    function renderLists(lists) {
       listsContainer.innerHTML = '';
-      lists.forEach(list => {
-        const listElement = document.createElement('div');
-        listElement.classList.add('list');
-        listElement.innerHTML = `
-          <div class="list-header">
-            <h2>${list.name}</h2>
-            <button onclick="deleteList('${list.id}')">Удалить</button>
-          </div>
-          <p>Дата: ${list.date}</p>
-          <p>Доход: ${list.income}</p>
-          <p>Остаток: ${list.remaining}</p>
+      data.forEach(list => {
+        const div = document.createElement('div');
+        div.className = 'list';
+        div.innerHTML = `
+          <strong>${list.name}</strong> (Осталось: ${list.remaining} из ${list.budget})
+          <button onclick="deleteList(${list.id})">Удалить</button>
+          <form onsubmit="addExpense(event, ${list.id})">
+            <input type="text" name="title" placeholder="Название траты" required>
+            <input type="number" name="amount" placeholder="Сумма" required>
+            <button type="submit">➕</button>
+          </form>
           <div class="expenses">
-            ${(list.expenses || []).map(exp => `
-              <div class="expense-item">
-                <span>${exp.name}</span>
-                <span>${exp.amount}</span>
-                <button onclick="deleteExpense('${list.id}', '${exp.id}')">Удалить</button>
-              </div>`).join('') || '<p>Нет расходов</p>'}
-          </div>
-          <div class="add-expense">
-            <input type="text" placeholder="Название расхода" id="expense-name-${list.id}" />
-            <input type="number" placeholder="Сумма" id="expense-amount-${list.id}" />
-            <button onclick="addExpense('${list.id}')">Добавить расход</button>
+            ${list.expenses.map(exp => `
+              <div>
+                ${exp.title} - ${exp.amount}
+                <button onclick="deleteExpense(${list.id}, '${exp.id}')">✖️</button>
+              </div>
+            `).join('')}
           </div>
         `;
-        listsContainer.appendChild(listElement);
+        listsContainer.appendChild(div);
       });
     }
 
-    window.addExpense = async (listId) => {
-      const nameInput = document.getElementById(`expense-name-${listId}`);
-      const amountInput = document.getElementById(`expense-amount-${listId}`);
-      const name = nameInput.value.trim();
-      const amount = parseFloat(amountInput.value);
-
-      if (!name || isNaN(amount) || amount <= 0) {
-        alert('Некорректные данные');
-        return;
-      }
+    window.addExpense = async (e, listId) => {
+      e.preventDefault();
+      const form = e.target;
+      const title = form.title.value;
+      const amount = parseFloat(form.amount.value);
 
       const { data, error } = await supabase.from('cocomoney').select('*').eq('id', listId).single();
       if (error) {
-        console.error(error);
+        console.error('Ошибка при получении:', error);
         return;
       }
 
-      const newExpense = { id: Date.now().toString(), name, amount };
-      const updatedExpenses = [...(data.expenses || []), newExpense];
+      const expense = { id: crypto.randomUUID(), title, amount };
+      const updatedExpenses = [...data.expenses, expense];
       const updatedRemaining = data.remaining - amount;
 
-      await supabase.from('cocomoney').update({
+      const { error: updateError } = await supabase.from('cocomoney').update({
         expenses: updatedExpenses,
         remaining: updatedRemaining
       }).eq('id', listId);
 
+      if (updateError) {
+        console.error('Ошибка при обновлении:', updateError);
+        return;
+      }
+
       fetchLists();
-    }
+    };
+
+    window.deleteList = async (id) => {
+      const { error } = await supabase.from('cocomoney').delete().eq('id', id);
+      if (error) {
+        console.error('Ошибка при удалении списка:', error);
+        return;
+      }
+      fetchLists();
+    };
 
     window.deleteExpense = async (listId, expenseId) => {
-      const { data } = await supabase.from('cocomoney').select('*').eq('id', listId).single();
-      const updatedExpenses = data.expenses.filter(e => e.id !== expenseId);
-      const deletedExpense = data.expenses.find(e => e.id === expenseId);
-      const updatedRemaining = data.remaining + (deletedExpense?.amount || 0);
+      const { data, error } = await supabase.from('cocomoney').select('*').eq('id', listId).single();
+      if (error) {
+        console.error('Ошибка при получении:', error);
+        return;
+      }
 
-      await supabase.from('cocomoney').update({
+      const updatedExpenses = data.expenses.filter(e => e.id !== expenseId);
+      const deleted = data.expenses.find(e => e.id === expenseId);
+      const updatedRemaining = data.remaining + (deleted?.amount || 0);
+
+      const { error: updateError } = await supabase.from('cocomoney').update({
         expenses: updatedExpenses,
         remaining: updatedRemaining
       }).eq('id', listId);
 
-      fetchLists();
-    }
+      if (updateError) {
+        console.error('Ошибка при обновлении:', updateError);
+        return;
+      }
 
-    window.deleteList = async (listId) => {
-      if (!confirm('Удалить этот лист?')) return;
-      await supabase.from('cocomoney').delete().eq('id', listId);
       fetchLists();
-    }
+    };
 
     fetchLists();
   </script>
