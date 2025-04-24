@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Учет доходов и расходов</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <h1>Учет доходов и расходов</h1>
+    <div class="controls">
+      <input type="text" id="income-list-name" placeholder="Название листа поступлений" />
+      <input type="number" id="income-amount" placeholder="Сумма поступления" />
+      <input type="date" id="income-date" />
+      <button id="create-list-btn">Создать лист</button>
+    </div>
+    <div id="lists-container">
+      <!-- Листы доходов будут добавляться сюда -->
+    </div>
+  </div>
+  <script type="module" src="script.js"></script>
+</body>
+</html>
