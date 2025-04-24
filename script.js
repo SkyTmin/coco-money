@@ -1,35 +1,31 @@
-// Import Supabase library
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
 
-// Initialize Supabase
 const supabaseUrl = 'https://vflflxppglrgdcxeszzu.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZmbGZseHBwZ2xyZ2RjeGVzenp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU1MjI4MzMsImV4cCI6MjA2MTA5ODgzM30.oFsEJ21xU05QyXZxfSXv0WKW4P8ps3HcB4Ot7kK7DDQ';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// DOM Elements
+// DOM
 const listsContainer = document.getElementById('lists-container');
 const createListBtn = document.getElementById('create-list-btn');
 const incomeListNameInput = document.getElementById('income-list-name');
 const incomeAmountInput = document.getElementById('income-amount');
 const incomeDateInput = document.getElementById('income-date');
 
-// Fetch and render lists from Supabase
+// Отрисовать списки
 async function fetchLists() {
   const { data, error } = await supabase.from('cocomoney').select('*');
   if (error) {
-    console.error('Ошибка при получении данных:', error);
+    console.error('Ошибка загрузки данных:', error);
     return;
   }
   renderLists(data);
 }
 
-// Render lists
 function renderLists(lists) {
   listsContainer.innerHTML = '';
   lists.forEach(list => {
     const listElement = document.createElement('div');
     listElement.classList.add('list');
-
     listElement.innerHTML = `
       <div class="list-header">
         <h2>${list.name}</h2>
@@ -41,7 +37,7 @@ function renderLists(lists) {
         <p>Остаток: <span>${list.remaining}</span></p>
       </div>
       <div class="expenses">
-        ${list.expenses.length > 0 ? list.expenses.map(expense => `
+        ${list.expenses && list.expenses.length > 0 ? list.expenses.map(expense => `
           <div class="expense-item">
             <span>${expense.name}</span>
             <span>${expense.amount}</span>
@@ -59,87 +55,109 @@ function renderLists(lists) {
   });
 }
 
-// Add a new list
+// Создание нового листа
 createListBtn.addEventListener('click', async () => {
-  const listName = incomeListNameInput.value.trim();
-  const incomeAmount = parseFloat(incomeAmountInput.value);
-  const incomeDate = incomeDateInput.value;
+  const name = incomeListNameInput.value.trim();
+  const income = parseFloat(incomeAmountInput.value);
+  const date = incomeDateInput.value;
 
-  if (!listName || isNaN(incomeAmount) || incomeAmount <= 0 || !incomeDate) {
-    alert('Введите корректные данные для листа поступлений!');
+  if (!name || isNaN(income) || income <= 0 || !date) {
+    alert('Проверьте корректность введённых данных.');
     return;
   }
 
-  const newList = {
-    name: listName,
-    income: incomeAmount,
-    date: incomeDate,
-    remaining: incomeAmount,
-    expenses: [], // Initially, no expenses
-  };
+  const { error } = await supabase.from('cocomoney').insert([{
+    name,
+    income,
+    date,
+    remaining: income,
+    expenses: []
+  }]);
 
-  const { error } = await supabase.from('cocomoney').insert([newList]);
   if (error) {
-    console.error('Ошибка при добавлении данных:', error);
+    console.error('Ошибка добавления данных:', error);
     return;
   }
 
-  fetchLists(); // Refresh the lists
   incomeListNameInput.value = '';
   incomeAmountInput.value = '';
   incomeDateInput.value = '';
+
+  fetchLists();
 });
 
-// Delete a list
-window.deleteList = async (listId) => {
-  const confirmDelete = confirm('Вы уверены, что хотите удалить этот лист поступлений?');
-  if (!confirmDelete) return;
+// Удаление листа
+window.deleteList = async (id) => {
+  if (!confirm('Удалить этот лист?')) return;
 
-  const { error } = await supabase.from('cocomoney').delete().eq('id', listId);
+  const { error } = await supabase.from('cocomoney').delete().eq('id', id);
   if (error) {
-    console.error('Ошибка при удалении данных:', error);
+    console.error('Ошибка удаления:', error);
     return;
   }
 
-  fetchLists(); // Refresh the lists
+  fetchLists();
 };
 
-// Add an expense to a list
+// Добавление расхода
 window.addExpense = async (listId) => {
-  const expenseNameInput = document.getElementById(`expense-name-${listId}`);
-  const expenseAmountInput = document.getElementById(`expense-amount-${listId}`);
+  const nameInput = document.getElementById(`expense-name-${listId}`);
+  const amountInput = document.getElementById(`expense-amount-${listId}`);
 
-  const expenseName = expenseNameInput.value.trim();
-  const expenseAmount = parseFloat(expenseAmountInput.value);
+  const name = nameInput.value.trim();
+  const amount = parseFloat(amountInput.value);
 
-  if (!expenseName || isNaN(expenseAmount) || expenseAmount <= 0) {
+  if (!name || isNaN(amount) || amount <= 0) {
     alert('Введите корректные данные для расхода!');
     return;
   }
 
   const { data, error } = await supabase.from('cocomoney').select('expenses, remaining').eq('id', listId).single();
   if (error) {
-    console.error('Ошибка при получении данных списка:', error);
+    console.error('Ошибка при получении текущих данных:', error);
     return;
   }
 
-  const updatedExpenses = [...data.expenses, { id: Date.now().toString(), name: expenseName, amount: expenseAmount }];
-  const updatedRemaining = data.remaining - expenseAmount;
+  const newExpense = { id: Date.now().toString(), name, amount };
+  const updatedExpenses = [...(data.expenses || []), newExpense];
+  const updatedRemaining = data.remaining - amount;
 
   const { error: updateError } = await supabase.from('cocomoney').update({
     expenses: updatedExpenses,
-    remaining: updatedRemaining,
+    remaining: updatedRemaining
   }).eq('id', listId);
 
   if (updateError) {
-    console.error('Ошибка при обновлении данных:', updateError);
+    console.error('Ошибка при обновлении расходов:', updateError);
     return;
   }
 
-  fetchLists(); // Refresh the lists
-  expenseNameInput.value = '';
-  expenseAmountInput.value = '';
+  fetchLists();
 };
 
-// Fetch lists on page load
+window.deleteExpense = async (listId, expenseId) => {
+  const { data, error } = await supabase.from('cocomoney').select('expenses, remaining').eq('id', listId).single();
+  if (error) {
+    console.error('Ошибка загрузки данных:', error);
+    return;
+  }
+
+  const expenseToRemove = data.expenses.find(e => e.id === expenseId);
+  const updatedExpenses = data.expenses.filter(e => e.id !== expenseId);
+  const updatedRemaining = data.remaining + (expenseToRemove?.amount || 0);
+
+  const { error: updateError } = await supabase.from('cocomoney').update({
+    expenses: updatedExpenses,
+    remaining: updatedRemaining
+  }).eq('id', listId);
+
+  if (updateError) {
+    console.error('Ошибка удаления расхода:', updateError);
+    return;
+  }
+
+  fetchLists();
+};
+
+// Загрузка при старте
 fetchLists();
